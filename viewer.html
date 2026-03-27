@@ -851,7 +851,7 @@ function openPDF(fileId) {
 
 // ── Word ──────────────────────────────────────
 function openWord(fileId) {
-  const src = `https://docs.google.com/viewer?srcid=${fileId}&embedded=true`;
+  const src = `https://drive.google.com/file/d/${fileId}/preview`;
   document.getElementById('embed-iframe').src = src;
   showView('embed-view');
 }
