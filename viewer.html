@@ -232,6 +232,17 @@ html, body {
 .badge-pdf  { background: rgba(248,113,113,.12); color: #f87171; }
 .badge-word { background: rgba(167,139,250,.12); color: #a78bfa; }
 
+.check-btn {
+  font-size: 15px; flex-shrink: 0; margin-left: 4px;
+  cursor: pointer; opacity: 0.5; transition: opacity .15s, transform .15s;
+  padding: 2px 4px; border-radius: 4px;
+}
+.check-btn:hover { opacity: 1; transform: scale(1.2); }
+.file-checked {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
 .sidebar-footer {
   padding: 14px 18px;
   border-top: 1px solid var(--border);
@@ -509,6 +520,7 @@ table.data-table tbody td:first-child {
 
     <div class="sidebar-footer">
       <button class="btn-sm primary" onclick="loadFiles()">🔄 새로고침</button>
+      <button class="btn-sm" onclick="clearChecked()">☐ 초기화</button>
       <button class="btn-sm" onclick="showConfig()">⚙ 설정</button>
     </div>
   </aside>
@@ -635,6 +647,29 @@ let filteredFiles  = [];
 let currentFilter  = 'all';
 let currentFile    = null;
 let currentFileId  = null;
+let checkedFiles   = new Set(JSON.parse(localStorage.getItem('checked_files') || '[]'));
+
+function clearChecked() {
+  if (!confirm('모든 체크를 초기화할까요?')) return;
+  checkedFiles.clear();
+  saveChecked();
+  renderFileList();
+}
+
+function saveChecked() {
+  localStorage.setItem('checked_files', JSON.stringify([...checkedFiles]));
+}
+
+function toggleCheck(e, fileId) {
+  e.stopPropagation();
+  if (checkedFiles.has(fileId)) {
+    checkedFiles.delete(fileId);
+  } else {
+    checkedFiles.add(fileId);
+  }
+  saveChecked();
+  renderFileList();
+}
 
 const DATA_EXTS = new Set(['.xlsx','.xls','.csv']);
 const DOC_EXTS  = new Set(['.pdf','.docx','.doc']);
@@ -743,21 +778,29 @@ function renderFileList() {
     return;
   }
 
-  el.innerHTML = filteredFiles.map((f, i) => {
-    const ext  = getExt(f.name);
-    const icon = getIcon(ext);
-    const badge = getBadge(ext);
-    const mod  = f.modifiedTime ? f.modifiedTime.slice(0,10) : '';
-    const active = currentFileId === f.id ? 'active' : '';
+  // 미확인 먼저, 확인된 것은 아래로
+  const unchecked = filteredFiles.filter(f => !checkedFiles.has(f.id));
+  const checked   = filteredFiles.filter(f =>  checkedFiles.has(f.id));
+  const sorted    = [...unchecked, ...checked];
+
+  el.innerHTML = sorted.map((f, i) => {
+    const ext      = getExt(f.name);
+    const icon     = getIcon(ext);
+    const badge    = getBadge(ext);
+    const mod      = f.modifiedTime ? f.modifiedTime.slice(0,10) : '';
+    const active   = currentFileId === f.id ? 'active' : '';
+    const isChecked = checkedFiles.has(f.id);
+    const dimStyle = isChecked ? 'opacity:0.38;' : '';
+    const checkIcon = isChecked ? '✅' : '☐';
     return `
-      <div class="file-item ${active}" onclick="openFile('${f.id}','${escHtml(f.name)}','${f.mimeType || ''}')"
-           style="animation-delay:${i*0.025}s">
-        <div class="file-icon">${icon}</div>
+      <div class="file-item ${active}" style="animation-delay:${i*0.025}s;${dimStyle}"
+           onclick="openFile('${f.id}','${escHtml(f.name)}','${f.mimeType || ''}')">        <div class="file-icon">${icon}</div>
         <div class="file-info">
-          <div class="file-name">${escHtml(f.name)}</div>
+          <div class="file-name${isChecked ? ' file-checked' : ''}">${escHtml(f.name)}</div>
           <div class="file-meta">${mod}</div>
         </div>
         <span class="file-badge ${badge.cls}">${badge.text}</span>
+        <span class="check-btn" onclick="toggleCheck(event,'${f.id}')" title="확인 체크">${checkIcon}</span>
       </div>`;
   }).join('');
 }
