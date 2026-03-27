@@ -851,7 +851,8 @@ function openPDF(fileId) {
 
 // ── Word ──────────────────────────────────────
 function openWord(fileId) {
-  const src = `https://drive.google.com/file/d/${fileId}/preview`;
+  const downloadUrl = encodeURIComponent(`https://drive.google.com/uc?export=download&id=${fileId}`);
+  const src = `https://view.officeapps.live.com/op/embed.aspx?src=${downloadUrl}`;
   document.getElementById('embed-iframe').src = src;
   showView('embed-view');
 }
@@ -891,8 +892,10 @@ function openNewWindow() {
   const ext = getExt(currentFile.name);
   let url;
   if (ext === '.pdf')  url = `https://drive.google.com/file/d/${currentFileId}/preview`;
-  else if (ext === '.docx' || ext === '.doc')
-    url = `https://docs.google.com/viewer?srcid=${currentFileId}&embedded=true`;
+  else if (ext === '.docx' || ext === '.doc') {
+    const downloadUrl = encodeURIComponent(`https://drive.google.com/uc?export=download&id=${currentFileId}`);
+    url = `https://view.officeapps.live.com/op/view.aspx?src=${downloadUrl}`;
+  }
   else
     url = `https://drive.google.com/file/d/${currentFileId}/view`;
   window.open(url, '_blank');
