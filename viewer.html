@@ -345,6 +345,13 @@ html, body {
   flex-shrink: 0;
 }
 .row-count { font-size: 12px; color: var(--muted); }
+.wrap-btn {
+  font-size: 11px; padding: 4px 10px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--sub); cursor: pointer;
+  transition: all .15s;
+}
+.wrap-btn.on { background: var(--hover); border-color: var(--border2); color: var(--gold); }
 .sheet-tabs { display: flex; gap: 4px; }
 .sheet-tab {
   font-size: 12px; padding: 4px 12px;
@@ -393,12 +400,14 @@ table.data-table tbody tr:hover { background: var(--card); }
 table.data-table tbody td {
   padding: 9px 16px;
   color: var(--text);
-  white-space: nowrap;
-  max-width: 300px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 500px;
   overflow: hidden;
-  text-overflow: ellipsis;
   font-family: 'Noto Sans KR', sans-serif;
   font-size: 12px;
+  line-height: 1.6;
+  vertical-align: top;
 }
 table.data-table tbody td:first-child {
   color: var(--muted); font-size: 11px; text-align: center;
@@ -539,6 +548,7 @@ table.data-table tbody td:first-child {
         <div class="table-toolbar">
           <div class="sheet-tabs" id="sheet-tabs"></div>
           <div style="flex:1"></div>
+          <button class="wrap-btn on" id="wrap-btn" onclick="toggleWrap()">↵ 줄바꿈</button>
           <div class="row-count" id="row-count"></div>
         </div>
         <div class="table-wrap">
@@ -701,6 +711,29 @@ function filterFiles(type) {
 
 function searchFiles(q) {
   filterFiles(currentFilter);
+}
+
+function toggleWrap() {
+  const btn = document.getElementById('wrap-btn');
+  const tds = document.querySelectorAll('table.data-table tbody td');
+  const isOn = btn.classList.contains('on');
+  if (isOn) {
+    btn.classList.remove('on');
+    tds.forEach(td => {
+      td.style.whiteSpace = 'nowrap';
+      td.style.maxWidth   = '300px';
+      td.style.overflow   = 'hidden';
+      td.style.textOverflow = 'ellipsis';
+    });
+  } else {
+    btn.classList.add('on');
+    tds.forEach(td => {
+      td.style.whiteSpace = 'pre-wrap';
+      td.style.maxWidth   = '500px';
+      td.style.overflow   = '';
+      td.style.textOverflow = '';
+    });
+  }
 }
 
 function renderFileList() {
