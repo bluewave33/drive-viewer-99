@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drive File Viewer</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg:        #070c16;
+  --sidebar:   #0c1422;
+  --panel:     #111926;
+  --card:      #161f2e;
+  --hover:     #1c2840;
+  --border:    rgba(255,255,255,0.07);
+  --border2:   rgba(255,255,255,0.12);
+  --gold:      #f0b429;
+  --gold2:     #fcd34d;
+  --blue:      #4f9cf9;
+  --green:     #34d399;
+  --red:       #f87171;
+  --text:      #e2eaf8;
+  --sub:       #8b9abf;
+  --muted:     #4a5578;
+  --radius:    10px;
+  --radius-lg: 16px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: 'Outfit', 'Noto Sans KR', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* ── 설정 모달 ─────────────────────────────────── */
+#cfg-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(7,12,22,0.92);
+  backdrop-filter: blur(12px);
+  display: flex; align-items: center; justify-content: center;
+}
+#cfg-modal {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 40px;
+  width: 520px;
+  max-width: 95vw;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+  animation: modal-in .3s ease;
+}
+@keyframes modal-in {
+  from { opacity:0; transform: translateY(20px) scale(.97); }
+  to   { opacity:1; transform: translateY(0)    scale(1);   }
+}
+.cfg-logo {
+  font-size: 36px; margin-bottom: 6px;
+}
+.cfg-title {
+  font-size: 22px; font-weight: 700; color: var(--gold);
+  margin-bottom: 4px;
+}
+.cfg-subtitle {
+  font-size: 13px; color: var(--sub); margin-bottom: 30px;
+  font-family: 'Noto Sans KR', sans-serif;
+}
+.cfg-field { margin-bottom: 18px; }
+.cfg-label {
+  font-size: 11px; font-weight: 600; color: var(--sub);
+  letter-spacing: .08em; text-transform: uppercase;
+  margin-bottom: 8px; display: block;
+}
+.cfg-input {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: 'Outfit', monospace;
+  font-size: 13px;
+  padding: 12px 16px;
+  outline: none;
+  transition: border-color .2s;
+}
+.cfg-input:focus { border-color: var(--gold); }
+.cfg-hint {
+  font-size: 11px; color: var(--muted); margin-top: 6px;
+  font-family: 'Noto Sans KR', sans-serif;
+}
+.cfg-btn {
+  width: 100%;
+  background: var(--gold);
+  color: var(--bg);
+  border: none;
+  border-radius: var(--radius);
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px; font-weight: 700;
+  padding: 14px;
+  cursor: pointer;
+  transition: background .2s, transform .1s;
+  margin-top: 8px;
+}
+.cfg-btn:hover  { background: var(--gold2); }
+.cfg-btn:active { transform: scale(.98); }
+
+/* ── 앱 레이아웃 ────────────────────────────────── */
+#app {
+  display: flex;
+  height: 100vh;
+  opacity: 0;
+  transition: opacity .4s;
+}
+#app.visible { opacity: 1; }
+
+/* ── 사이드바 ────────────────────────────────────── */
+#sidebar {
+  width: 300px;
+  min-width: 300px;
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-head {
+  padding: 22px 22px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.app-logo {
+  font-size: 22px; font-weight: 800; color: var(--gold);
+  letter-spacing: -.02em; line-height: 1;
+}
+.app-sub {
+  font-size: 11px; color: var(--sub);
+  font-family: 'Noto Sans KR', sans-serif;
+  margin-top: 4px;
+}
+
+.stats-row {
+  display: flex; gap: 8px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.stat-chip {
+  flex: 1;
+  background: var(--card);
+  border-radius: 8px;
+  padding: 10px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: background .15s;
+}
+.stat-chip:hover { background: var(--hover); }
+.stat-chip.active { background: var(--hover); border: 1px solid var(--border2); }
+.stat-num  { font-size: 18px; font-weight: 700; color: var(--text); line-height: 1; }
+.stat-lbl  { font-size: 10px; color: var(--sub); margin-top: 3px;
+             font-family: 'Noto Sans KR', sans-serif; }
+
+.search-wrap {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.search-box {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 13px;
+  padding: 9px 14px 9px 36px;
+  outline: none;
+  transition: border-color .2s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%234a5578' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 12px center;
+}
+.search-box:focus { border-color: var(--gold); }
+
+#file-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+#file-list::-webkit-scrollbar { width: 4px; }
+#file-list::-webkit-scrollbar-track { background: transparent; }
+#file-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+.file-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 18px;
+  cursor: pointer;
+  transition: background .12s;
+  border-left: 3px solid transparent;
+  animation: item-in .25s ease both;
+}
+@keyframes item-in {
+  from { opacity:0; transform: translateX(-8px); }
+  to   { opacity:1; transform: translateX(0);    }
+}
+.file-item:hover { background: var(--hover); }
+.file-item.active {
+  background: var(--hover);
+  border-left-color: var(--gold);
+}
+.file-icon {
+  font-size: 22px; width: 28px; text-align: center; flex-shrink: 0;
+}
+.file-info { flex: 1; min-width: 0; }
+.file-name {
+  font-size: 13px; font-weight: 500; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: 'Noto Sans KR', sans-serif;
+}
+.file-meta {
+  font-size: 11px; color: var(--muted); margin-top: 2px;
+}
+.file-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 7px;
+  border-radius: 20px; letter-spacing: .04em;
+  flex-shrink: 0;
+}
+.badge-xls  { background: rgba(52,211,153,.12); color: #34d399; }
+.badge-csv  { background: rgba(79,156,249,.12); color: #4f9cf9; }
+.badge-pdf  { background: rgba(248,113,113,.12); color: #f87171; }
+.badge-word { background: rgba(167,139,250,.12); color: #a78bfa; }
+
+.sidebar-footer {
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.btn-sm {
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--sub);
+  font-size: 12px; font-family: 'Noto Sans KR', sans-serif;
+  padding: 8px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.btn-sm:hover { background: var(--hover); color: var(--text); }
+.btn-sm.primary {
+  background: rgba(240,180,41,.1);
+  border-color: rgba(240,180,41,.25);
+  color: var(--gold);
+}
+.btn-sm.primary:hover { background: rgba(240,180,41,.18); }
+
+/* ── 메인 영역 ──────────────────────────────────── */
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#main-header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  height: 60px;
+  display: flex; align-items: center; gap: 16px;
+  flex-shrink: 0;
+}
+.file-path {
+  flex: 1;
+  font-size: 14px; color: var(--sub);
+  font-family: 'Noto Sans KR', sans-serif;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.file-path span { color: var(--text); font-weight: 500; }
+.header-actions { display: flex; gap: 8px; }
+.btn-icon {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--sub);
+  font-size: 16px;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.btn-icon:hover { background: var(--hover); color: var(--text); }
+
+#preview-area {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── 환영 화면 ─────────────────────────────────── */
+#welcome {
+  height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 12px; color: var(--muted);
+}
+.welcome-icon { font-size: 64px; opacity: .4; }
+.welcome-title { font-size: 18px; font-weight: 600; color: var(--sub); }
+.welcome-sub {
+  font-size: 13px;
+  font-family: 'Noto Sans KR', sans-serif;
+  text-align: center; line-height: 1.7;
+}
+
+/* ── 로딩 ──────────────────────────────────────── */
+#loading {
+  display: none;
+  height: 100%;
+  align-items: center; justify-content: center;
+  flex-direction: column; gap: 16px;
+}
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border2);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 13px; color: var(--sub); }
+
+/* ── 테이블 뷰 ─────────────────────────────────── */
+#table-view {
+  display: none;
+  height: 100%;
+  flex-direction: column;
+}
+.table-toolbar {
+  padding: 12px 24px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+  flex-shrink: 0;
+}
+.row-count { font-size: 12px; color: var(--muted); }
+.sheet-tabs { display: flex; gap: 4px; }
+.sheet-tab {
+  font-size: 12px; padding: 4px 12px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--sub); cursor: pointer;
+  transition: all .15s;
+}
+.sheet-tab:hover { color: var(--text); }
+.sheet-tab.active { background: var(--hover); border-color: var(--border2); color: var(--gold); }
+
+.table-wrap {
+  flex: 1; overflow: auto;
+  padding: 0;
+}
+.table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+.table-wrap::-webkit-scrollbar-track { background: var(--bg); }
+.table-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+table.data-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 13px;
+}
+table.data-table thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--panel);
+  color: var(--gold);
+  font-size: 11px; font-weight: 600;
+  letter-spacing: .06em; text-transform: uppercase;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border2);
+  white-space: nowrap;
+  text-align: left;
+}
+table.data-table thead th:first-child {
+  color: var(--muted);
+  font-size: 10px;
+  width: 48px; text-align: center;
+}
+table.data-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background .1s;
+}
+table.data-table tbody tr:hover { background: var(--card); }
+table.data-table tbody td {
+  padding: 9px 16px;
+  color: var(--text);
+  white-space: nowrap;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 12px;
+}
+table.data-table tbody td:first-child {
+  color: var(--muted); font-size: 11px; text-align: center;
+  font-family: 'Outfit', sans-serif;
+}
+
+/* ── 임베드 뷰 (PDF/Word) ─────────────────────── */
+#embed-view {
+  display: none;
+  height: 100%;
+  flex-direction: column;
+}
+#embed-view iframe {
+  flex: 1; border: none; width: 100%; height: 100%;
+}
+
+/* ── 에러 뷰 ───────────────────────────────────── */
+#error-view {
+  display: none;
+  height: 100%;
+  align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px;
+}
+.error-icon { font-size: 48px; }
+.error-title { font-size: 16px; color: var(--red); font-weight: 600; }
+.error-msg   { font-size: 13px; color: var(--sub); text-align: center; max-width: 380px;
+               font-family: 'Noto Sans KR', sans-serif; line-height: 1.7; }
+
+/* ── 빈 목록 ───────────────────────────────────── */
+.empty-state {
+  padding: 48px 20px;
+  text-align: center; color: var(--muted);
+  font-size: 13px;
+  font-family: 'Noto Sans KR', sans-serif;
+}
+.empty-icon { font-size: 36px; margin-bottom: 10px; opacity: .4; }
+
+/* ── 스크롤바 전역 ─────────────────────────────── */
+* { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+</style>
+</head>
+<body>
+
+<!-- ───────────── 설정 모달 ───────────── -->
+<div id="cfg-overlay">
+  <div id="cfg-modal">
+    <div class="cfg-logo">🗂️</div>
+    <div class="cfg-title">Drive File Viewer</div>
+    <div class="cfg-subtitle">Google Drive 폴더 ID와 API Key를 입력하세요</div>
+
+    <div class="cfg-field">
+      <label class="cfg-label">Drive 폴더 ID</label>
+      <input id="cfg-folder-id" class="cfg-input" placeholder="1ABC...XYZ" spellcheck="false">
+      <div class="cfg-hint">Drive 폴더 URL의 마지막 부분: drive.google.com/drive/folders/[여기]</div>
+    </div>
+
+    <div class="cfg-field">
+      <label class="cfg-label">Google API Key</label>
+      <input id="cfg-api-key" class="cfg-input" placeholder="AIza..." spellcheck="false">
+      <div class="cfg-hint">Google Cloud Console → Credentials → API Key (Drive API 허용)</div>
+    </div>
+
+    <button class="cfg-btn" onclick="applyConfig()">🚀  시작하기</button>
+  </div>
+</div>
+
+<!-- ───────────── 메인 앱 ───────────── -->
+<div id="app">
+
+  <!-- 사이드바 -->
+  <aside id="sidebar">
+    <div class="sidebar-head">
+      <div class="app-logo">⚡ Drive Viewer</div>
+      <div class="app-sub" id="folder-name">폴더 로딩 중...</div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-chip active" onclick="filterFiles('all')" id="chip-all">
+        <div class="stat-num" id="cnt-all">0</div>
+        <div class="stat-lbl">전체</div>
+      </div>
+      <div class="stat-chip" onclick="filterFiles('data')" id="chip-data">
+        <div class="stat-num" id="cnt-data">0</div>
+        <div class="stat-lbl">Excel/CSV</div>
+      </div>
+      <div class="stat-chip" onclick="filterFiles('doc')" id="chip-doc">
+        <div class="stat-num" id="cnt-doc">0</div>
+        <div class="stat-lbl">Word/PDF</div>
+      </div>
+    </div>
+
+    <div class="search-wrap">
+      <input class="search-box" id="search-input"
+             placeholder="파일 검색..."
+             oninput="searchFiles(this.value)">
+    </div>
+
+    <div id="file-list"></div>
+
+    <div class="sidebar-footer">
+      <button class="btn-sm primary" onclick="loadFiles()">🔄 새로고침</button>
+      <button class="btn-sm" onclick="showConfig()">⚙ 설정</button>
+    </div>
+  </aside>
+
+  <!-- 메인 -->
+  <main id="main">
+    <div id="main-header">
+      <div class="file-path" id="file-path-bar">
+        파일을 선택하면 여기에 미리보기가 표시됩니다
+      </div>
+      <div class="header-actions">
+        <div class="btn-icon" title="Drive에서 열기" onclick="openInDrive()" id="btn-open-drive" style="display:none">🔗</div>
+        <div class="btn-icon" title="새 창에서 열기" onclick="openNewWindow()" id="btn-open-new" style="display:none">↗</div>
+      </div>
+    </div>
+
+    <div id="preview-area">
+
+      <!-- 환영 -->
+      <div id="welcome" style="display:flex">
+        <div class="welcome-icon">📂</div>
+        <div class="welcome-title">파일을 선택하세요</div>
+        <div class="welcome-sub">
+          왼쪽 목록에서 파일을 클릭하면<br>
+          Excel · CSV · PDF · Word 파일을 바로 확인할 수 있습니다
+        </div>
+      </div>
+
+      <!-- 로딩 -->
+      <div id="loading" style="display:none;height:100%;align-items:center;justify-content:center;flex-direction:column;gap:16px">
+        <div class="spinner"></div>
+        <div class="loading-text">불러오는 중...</div>
+      </div>
+
+      <!-- 테이블 -->
+      <div id="table-view" style="display:none;height:100%;flex-direction:column">
+        <div class="table-toolbar">
+          <div class="sheet-tabs" id="sheet-tabs"></div>
+          <div style="flex:1"></div>
+          <div class="row-count" id="row-count"></div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="data-table">
+            <thead id="table-head"></thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 임베드 -->
+      <div id="embed-view" style="display:none;height:100%;flex-direction:column">
+        <iframe id="embed-iframe" allow="autoplay"></iframe>
+      </div>
+
+      <!-- 에러 -->
+      <div id="error-view" style="display:none;height:100%;align-items:center;justify-content:center;flex-direction:column;gap:12px">
+        <div class="error-icon">⚠️</div>
+        <div class="error-title">파일을 불러올 수 없습니다</div>
+        <div class="error-msg" id="error-msg"></div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════
+let CFG = {
+  API_KEY:   'AIzaSyDFJi9odbv2htHLFyrVRB9xrhkdxFVv3w8',
+  FOLDER_ID: '1gqNLFYCJyFIfRIjFmsMcHIF7kjfs3OPd'
+};
+
+// ── localStorage에서 설정 불러오기 ──
+function loadConfig() {
+  const saved = localStorage.getItem('drive_viewer_cfg');
+  if (saved) {
+    try { CFG = { ...CFG, ...JSON.parse(saved) }; } catch(e) {}
+  }
+  if (CFG.API_KEY && CFG.FOLDER_ID) {
+    hideCfgModal();
+    init();
+  } else {
+    showCfgModal();
+  }
+}
+
+function showCfgModal() {
+  document.getElementById('cfg-overlay').style.display = 'flex';
+  if (CFG.FOLDER_ID) document.getElementById('cfg-folder-id').value = CFG.FOLDER_ID;
+  if (CFG.API_KEY)   document.getElementById('cfg-api-key').value   = CFG.API_KEY;
+}
+
+function hideCfgModal() {
+  document.getElementById('cfg-overlay').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+}
+
+function showConfig() {
+  showCfgModal();
+}
+
+function applyConfig() {
+  const fid = document.getElementById('cfg-folder-id').value.trim();
+  const key = document.getElementById('cfg-api-key').value.trim();
+  if (!fid || !key) {
+    alert('폴더 ID와 API Key를 모두 입력해주세요.');
+    return;
+  }
+  CFG.FOLDER_ID = fid;
+  CFG.API_KEY   = key;
+  localStorage.setItem('drive_viewer_cfg', JSON.stringify(CFG));
+  hideCfgModal();
+  init();
+}
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+let allFiles       = [];
+let filteredFiles  = [];
+let currentFilter  = 'all';
+let currentFile    = null;
+let currentFileId  = null;
+
+const DATA_EXTS = new Set(['.xlsx','.xls','.csv']);
+const DOC_EXTS  = new Set(['.pdf','.docx','.doc']);
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+async function init() {
+  await loadFiles();
+}
+
+// ═══════════════════════════════════════════════
+//  DRIVE API: 파일 목록
+// ═══════════════════════════════════════════════
+async function loadFiles() {
+  document.getElementById('file-list').innerHTML =
+    '<div class="empty-state"><div class="empty-icon">⏳</div>파일 목록을 불러오는 중...</div>';
+
+  try {
+    const url = `https://www.googleapis.com/drive/v3/files`
+      + `?q='${CFG.FOLDER_ID}'+in+parents+and+trashed=false`
+      + `&fields=files(id,name,mimeType,modifiedTime,size)`
+      + `&pageSize=200`
+      + `&orderBy=name`
+      + `&key=${CFG.API_KEY}`;
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    allFiles = (data.files || []).filter(f =>
+      DATA_EXTS.has(getExt(f.name)) || DOC_EXTS.has(getExt(f.name))
+    );
+
+    // 폴더 이름 표시
+    document.getElementById('folder-name').textContent =
+      `${allFiles.length}개 파일`;
+
+    updateStats();
+    filterFiles(currentFilter);
+  } catch(e) {
+    document.getElementById('file-list').innerHTML =
+      `<div class="empty-state"><div class="empty-icon">❌</div>불러오기 실패<br><small style="font-size:11px">${e.message}</small></div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  필터 / 검색
+// ═══════════════════════════════════════════════
+function updateStats() {
+  const dataCount = allFiles.filter(f => DATA_EXTS.has(getExt(f.name))).length;
+  const docCount  = allFiles.filter(f => DOC_EXTS.has(getExt(f.name))).length;
+  document.getElementById('cnt-all').textContent  = allFiles.length;
+  document.getElementById('cnt-data').textContent = dataCount;
+  document.getElementById('cnt-doc').textContent  = docCount;
+}
+
+function filterFiles(type) {
+  currentFilter = type;
+  ['all','data','doc'].forEach(t => {
+    document.getElementById(`chip-${t}`).classList.toggle('active', t === type);
+  });
+
+  const q = document.getElementById('search-input').value.toLowerCase();
+  let base = allFiles;
+  if (type === 'data') base = allFiles.filter(f => DATA_EXTS.has(getExt(f.name)));
+  if (type === 'doc')  base = allFiles.filter(f => DOC_EXTS.has(getExt(f.name)));
+
+  filteredFiles = q ? base.filter(f => f.name.toLowerCase().includes(q)) : base;
+  renderFileList();
+}
+
+function searchFiles(q) {
+  filterFiles(currentFilter);
+}
+
+function renderFileList() {
+  const el = document.getElementById('file-list');
+  if (!filteredFiles.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>파일이 없습니다</div>';
+    return;
+  }
+
+  el.innerHTML = filteredFiles.map((f, i) => {
+    const ext  = getExt(f.name);
+    const icon = getIcon(ext);
+    const badge = getBadge(ext);
+    const mod  = f.modifiedTime ? f.modifiedTime.slice(0,10) : '';
+    const active = currentFileId === f.id ? 'active' : '';
+    return `
+      <div class="file-item ${active}" onclick="openFile('${f.id}','${escHtml(f.name)}','${f.mimeType || ''}')"
+           style="animation-delay:${i*0.025}s">
+        <div class="file-icon">${icon}</div>
+        <div class="file-info">
+          <div class="file-name">${escHtml(f.name)}</div>
+          <div class="file-meta">${mod}</div>
+        </div>
+        <span class="file-badge ${badge.cls}">${badge.text}</span>
+      </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+//  파일 열기
+// ═══════════════════════════════════════════════
+async function openFile(fileId, name, mimeType) {
+  currentFileId = fileId;
+  currentFile   = { id: fileId, name, mimeType };
+
+  // 사이드바 active 표시
+  document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+  event?.currentTarget?.classList.add('active');
+
+  // 헤더 업데이트
+  document.getElementById('file-path-bar').innerHTML =
+    `<span>${escHtml(name)}</span>`;
+  document.getElementById('btn-open-drive').style.display = 'flex';
+  document.getElementById('btn-open-new').style.display   = 'flex';
+
+  const ext = getExt(name);
+
+  if (ext === '.csv') {
+    await openCSV(fileId, name);
+  } else if (ext === '.xlsx' || ext === '.xls') {
+    await openExcel(fileId, name);
+  } else if (ext === '.pdf') {
+    openPDF(fileId);
+  } else if (ext === '.docx' || ext === '.doc') {
+    openWord(fileId);
+  } else {
+    showError('지원하지 않는 파일 형식입니다.');
+  }
+}
+
+// ── CSV ──────────────────────────────────────
+async function openCSV(fileId, name) {
+  showLoading();
+  try {
+    const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${CFG.API_KEY}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+
+    const result = Papa.parse(text, { header: false, skipEmptyLines: true });
+    renderTable(result.data, [], name);
+  } catch(e) {
+    showError(`CSV 로드 실패: ${e.message}\n\n폴더가 공개 공유 설정되어 있는지 확인하세요.`);
+  }
+}
+
+// ── Excel ─────────────────────────────────────
+async function openExcel(fileId, name) {
+  showLoading();
+  try {
+    const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${CFG.API_KEY}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const buf = await res.arrayBuffer();
+
+    const wb = XLSX.read(buf, { type: 'array' });
+    renderExcel(wb);
+  } catch(e) {
+    showError(`Excel 로드 실패: ${e.message}\n\n폴더가 공개 공유 설정되어 있는지 확인하세요.`);
+  }
+}
+
+let currentWB = null;
+
+function renderExcel(wb) {
+  currentWB = wb;
+  const tabsEl = document.getElementById('sheet-tabs');
+  tabsEl.innerHTML = wb.SheetNames.map((n, i) =>
+    `<div class="sheet-tab ${i===0?'active':''}" onclick="switchSheet('${escHtml(n)}',this)">${escHtml(n)}</div>`
+  ).join('');
+  switchSheet(wb.SheetNames[0]);
+}
+
+function switchSheet(sheetName, tabEl) {
+  if (tabEl) {
+    document.querySelectorAll('.sheet-tab').forEach(t => t.classList.remove('active'));
+    tabEl.classList.add('active');
+  }
+  const ws   = currentWB.Sheets[sheetName];
+  const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  renderTable(data, [], sheetName);
+}
+
+// ── 테이블 렌더링 ─────────────────────────────
+function renderTable(rows, _unused, title) {
+  if (!rows.length) {
+    showError('데이터가 없습니다.');
+    return;
+  }
+  const headers = rows[0];
+  const body    = rows.slice(1);
+
+  const thead = document.getElementById('table-head');
+  const tbody = document.getElementById('table-body');
+
+  thead.innerHTML = `<tr>
+    <th>#</th>
+    ${headers.map(h => `<th>${escHtml(String(h))}</th>`).join('')}
+  </tr>`;
+
+  tbody.innerHTML = body.map((row, i) => `
+    <tr>
+      <td>${i+1}</td>
+      ${headers.map((_, j) => `<td title="${escHtml(String(row[j]??''))}">${escHtml(String(row[j]??''))}</td>`).join('')}
+    </tr>
+  `).join('');
+
+  document.getElementById('row-count').textContent = `${body.length}행 × ${headers.length}열`;
+  showView('table-view');
+}
+
+// ── PDF ───────────────────────────────────────
+function openPDF(fileId) {
+  const src = `https://drive.google.com/file/d/${fileId}/preview`;
+  document.getElementById('embed-iframe').src = src;
+  showView('embed-view');
+}
+
+// ── Word ──────────────────────────────────────
+function openWord(fileId) {
+  const src = `https://docs.google.com/viewer?srcid=${fileId}&embedded=true`;
+  document.getElementById('embed-iframe').src = src;
+  showView('embed-view');
+}
+
+// ═══════════════════════════════════════════════
+//  뷰 전환
+// ═══════════════════════════════════════════════
+function showView(viewId) {
+  ['welcome','loading','table-view','embed-view','error-view'].forEach(id => {
+    const el = document.getElementById(id);
+    el.style.display = 'none';
+  });
+  const target = document.getElementById(viewId);
+  target.style.display = (viewId === 'table-view' || viewId === 'embed-view')
+    ? 'flex' : (viewId === 'loading' ? 'flex' : 'flex');
+}
+
+function showLoading() {
+  showView('loading');
+}
+
+function showError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+  showView('error-view');
+}
+
+// ═══════════════════════════════════════════════
+//  외부 링크
+// ═══════════════════════════════════════════════
+function openInDrive() {
+  if (currentFileId)
+    window.open(`https://drive.google.com/file/d/${currentFileId}/view`, '_blank');
+}
+
+function openNewWindow() {
+  if (!currentFile) return;
+  const ext = getExt(currentFile.name);
+  let url;
+  if (ext === '.pdf')  url = `https://drive.google.com/file/d/${currentFileId}/preview`;
+  else if (ext === '.docx' || ext === '.doc')
+    url = `https://docs.google.com/viewer?srcid=${currentFileId}&embedded=true`;
+  else
+    url = `https://drive.google.com/file/d/${currentFileId}/view`;
+  window.open(url, '_blank');
+}
+
+// ═══════════════════════════════════════════════
+//  유틸
+// ═══════════════════════════════════════════════
+function getExt(name) {
+  return (name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+}
+
+function getIcon(ext) {
+  return {
+    '.xlsx':'📊', '.xls':'📊',
+    '.csv' :'📋',
+    '.pdf' :'📄',
+    '.docx':'📝', '.doc':'📝',
+  }[ext] || '📁';
+}
+
+function getBadge(ext) {
+  return {
+    '.xlsx': { cls:'badge-xls',  text:'XLSX' },
+    '.xls' : { cls:'badge-xls',  text:'XLS'  },
+    '.csv' : { cls:'badge-csv',  text:'CSV'  },
+    '.pdf' : { cls:'badge-pdf',  text:'PDF'  },
+    '.docx': { cls:'badge-word', text:'DOCX' },
+    '.doc' : { cls:'badge-word', text:'DOC'  },
+  }[ext] || { cls:'', text:ext.replace('.','').toUpperCase() };
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+// ── 키보드 단축키 ─────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('cfg-overlay');
+    if (overlay.style.display !== 'none') overlay.style.display = 'none';
+  }
+});
+
+// ── 시작 ─────────────────────────────────────
+loadConfig();
+</script>
+</body>
+</html>
