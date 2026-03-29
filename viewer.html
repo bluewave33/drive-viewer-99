@@ -232,6 +232,33 @@ html, body {
 .badge-pdf  { background: rgba(160,48,48,.12); color: #a03030; }
 .badge-word { background: rgba(140,100,40,.12); color: #8c6428; }
 
+/* ── 폴더 트리 ──────────────────────────── */
+#folder-tree {
+  border-bottom: 1px solid var(--border);
+  padding: 6px 0;
+  flex-shrink: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+#folder-tree::-webkit-scrollbar { width: 3px; }
+#folder-tree::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+.tree-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 16px 7px 0;
+  cursor: pointer;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 12px; color: var(--sub);
+  transition: background .15s, color .15s;
+  border-left: 3px solid transparent;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tree-item:hover { background: var(--hover); color: var(--text); }
+.tree-item.active { border-left-color: var(--gold); color: var(--gold); background: var(--hover); font-weight: 600; }
+.tree-indent { display: inline-block; width: 14px; flex-shrink: 0; }
+.tree-icon { font-size: 13px; flex-shrink: 0; }
+.tree-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.tree-count { font-size: 10px; color: var(--muted); margin-left: auto; padding-right: 10px; flex-shrink: 0; }
+
 .check-btn {
   font-size: 15px; flex-shrink: 0; margin-left: 4px;
   cursor: pointer; opacity: 0.5; transition: opacity .15s, transform .15s;
@@ -510,6 +537,8 @@ table.data-table tbody td:first-child {
       </div>
     </div>
 
+    <div id="folder-tree"><div class="empty-state" style="padding:16px;font-size:11px">폴더 로딩 중...</div></div>
+
     <div class="search-wrap">
       <input class="search-box" id="search-input"
              placeholder="파일 검색..."
@@ -643,6 +672,9 @@ function applyConfig() {
 //  STATE
 // ═══════════════════════════════════════════════
 let allFiles       = [];
+let allFolders     = [];        // Drive 폴더 목록
+let folderFileMap  = {};        // folderId → [files]
+let currentFolderId = 'root';   // 선택된 폴더 ('root' = 전체)
 let filteredFiles  = [];
 let currentFilter  = 'all';
 let currentFile    = null;
@@ -698,47 +730,145 @@ async function init() {
 // ═══════════════════════════════════════════════
 //  DRIVE API: 파일 목록
 // ═══════════════════════════════════════════════
+// Drive API 한 페이지 조회 (pageToken 지원)
+async function driveList(q, fields, pageToken) {
+  let url = `https://www.googleapis.com/drive/v3/files`
+    + `?q=${encodeURIComponent(q)}`
+    + `&fields=${encodeURIComponent(fields)}`
+    + `&pageSize=500&orderBy=name&key=${CFG.API_KEY}`;
+  if (pageToken) url += `&pageToken=${pageToken}`;
+  const res = await fetch(url);
+  if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || `HTTP ${res.status}`); }
+  return res.json();
+}
+
+// 하위 폴더 포함 모든 파일+폴더 재귀 로드
+async function loadAll(folderId, depth) {
+  // 이 폴더의 자식 항목 모두 가져오기
+  const q = `'${folderId}' in parents and trashed=false`;
+  const fields = 'nextPageToken,files(id,name,mimeType,modifiedTime,size,parents)';
+  let items = [], pt = null;
+  do {
+    const data = await driveList(q, fields, pt);
+    items = items.concat(data.files || []);
+    pt = data.nextPageToken;
+  } while (pt);
+
+  const subFolders = items.filter(f => f.mimeType === 'application/vnd.google-apps.folder');
+  const files      = items.filter(f =>
+    DATA_EXTS.has(getExt(f.name)) || DOC_EXTS.has(getExt(f.name))
+  ).map(f => ({ ...f, _folderId: folderId, _depth: depth }));
+
+  // 폴더 등록
+  for (const sf of subFolders) {
+    allFolders.push({ ...sf, _parentId: folderId, _depth: depth });
+  }
+  // 파일 등록
+  allFiles = allFiles.concat(files);
+
+  // 재귀
+  for (const sf of subFolders) {
+    await loadAll(sf.id, depth + 1);
+  }
+}
+
 async function loadFiles() {
   document.getElementById('file-list').innerHTML =
-    '<div class="empty-state"><div class="empty-icon">⏳</div>파일 목록을 불러오는 중...</div>';
+    '<div class="empty-state"><div class="empty-icon">⏳</div>로딩 중...</div>';
+  document.getElementById('folder-tree').innerHTML =
+    '<div class="empty-state" style="padding:16px;font-size:11px">⏳ 폴더 스캔 중...</div>';
+
+  allFiles   = [];
+  allFolders = [];
+  folderFileMap = {};
+  currentFolderId = 'root';
 
   try {
-    const url = `https://www.googleapis.com/drive/v3/files`
-      + `?q='${CFG.FOLDER_ID}'+in+parents+and+trashed=false`
-      + `&fields=files(id,name,mimeType,modifiedTime,size)`
-      + `&pageSize=200`
-      + `&orderBy=name`
-      + `&key=${CFG.API_KEY}`;
+    await loadAll(CFG.FOLDER_ID, 0);
 
-    const res = await fetch(url);
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    // folderFileMap 구성
+    folderFileMap['root'] = allFiles;
+    for (const f of allFiles) {
+      if (!folderFileMap[f._folderId]) folderFileMap[f._folderId] = [];
+      folderFileMap[f._folderId].push(f);
     }
-    const data = await res.json();
-    allFiles = (data.files || []).filter(f =>
-      DATA_EXTS.has(getExt(f.name)) || DOC_EXTS.has(getExt(f.name))
-    );
 
-    // 폴더 이름 표시
-    document.getElementById('folder-name').textContent =
-      `${allFiles.length}개 파일`;
+    document.getElementById('folder-name').textContent = `${allFiles.length}개 파일`;
 
+    renderFolderTree();
     updateStats();
     filterFiles(currentFilter);
   } catch(e) {
     document.getElementById('file-list').innerHTML =
       `<div class="empty-state"><div class="empty-icon">❌</div>불러오기 실패<br><small style="font-size:11px">${e.message}</small></div>`;
+    document.getElementById('folder-tree').innerHTML = '';
   }
+}
+
+// 폴더 트리 렌더링
+function renderFolderTree() {
+  const el = document.getElementById('folder-tree');
+  if (!allFolders.length) { el.innerHTML = ''; return; }
+
+  // 전체 항목
+  let html = `<div class="tree-item ${currentFolderId==='root'?'active':''}"
+    onclick="selectFolder('root')">
+    <span class="tree-indent"></span>
+    <span class="tree-icon">📂</span>
+    <span class="tree-label">전체</span>
+    <span class="tree-count">${allFiles.length}</span>
+  </div>`;
+
+  // 폴더 트리 (depth 순)
+  function renderNode(parentId, depth) {
+    const children = allFolders.filter(f => f._parentId === parentId)
+      .sort((a,b) => a.name.localeCompare(b.name));
+    for (const folder of children) {
+      const cnt = (folderFileMap[folder.id] || []).length;
+      const isActive = currentFolderId === folder.id;
+      const indent = depth * 14;
+      html += `<div class="tree-item ${isActive?'active':''}"
+        onclick="selectFolder('${folder.id}')"
+        title="${escHtml(folder.name)}">
+        <span class="tree-indent" style="width:${indent+14}px"></span>
+        <span class="tree-icon">${depth===0?'📁':'📄'}</span>
+        <span class="tree-label">${escHtml(folder.name)}</span>
+        <span class="tree-count">${cnt}</span>
+      </div>`;
+      renderNode(folder.id, depth + 1);
+    }
+  }
+  renderNode(CFG.FOLDER_ID, 0);
+  el.innerHTML = html;
+}
+
+// 폴더 선택
+function selectFolder(folderId) {
+  currentFolderId = folderId;
+  renderFolderTree();
+  updateStats();
+  filterFiles(currentFilter);
 }
 
 // ═══════════════════════════════════════════════
 //  필터 / 검색
 // ═══════════════════════════════════════════════
+function currentFolderFiles() {
+  if (currentFolderId === 'root') return allFiles;
+  // 선택 폴더 + 모든 하위 폴더 파일 포함
+  const collect = (fid) => {
+    const direct = folderFileMap[fid] || [];
+    const subs   = allFolders.filter(f => f._parentId === fid);
+    return [...direct, ...subs.flatMap(sf => collect(sf.id))];
+  };
+  return collect(currentFolderId);
+}
+
 function updateStats() {
-  const dataCount = allFiles.filter(f => DATA_EXTS.has(getExt(f.name))).length;
-  const docCount  = allFiles.filter(f => DOC_EXTS.has(getExt(f.name))).length;
-  document.getElementById('cnt-all').textContent  = allFiles.length;
+  const base = currentFolderFiles();
+  const dataCount = base.filter(f => DATA_EXTS.has(getExt(f.name))).length;
+  const docCount  = base.filter(f => DOC_EXTS.has(getExt(f.name))).length;
+  document.getElementById('cnt-all').textContent  = base.length;
   document.getElementById('cnt-data').textContent = dataCount;
   document.getElementById('cnt-doc').textContent  = docCount;
 }
@@ -749,10 +879,10 @@ function filterFiles(type) {
     document.getElementById(`chip-${t}`).classList.toggle('active', t === type);
   });
 
-  const q = document.getElementById('search-input').value.toLowerCase();
-  let base = allFiles;
-  if (type === 'data') base = allFiles.filter(f => DATA_EXTS.has(getExt(f.name)));
-  if (type === 'doc')  base = allFiles.filter(f => DOC_EXTS.has(getExt(f.name)));
+  const q   = document.getElementById('search-input').value.toLowerCase();
+  let base  = currentFolderFiles();
+  if (type === 'data') base = base.filter(f => DATA_EXTS.has(getExt(f.name)));
+  if (type === 'doc')  base = base.filter(f => DOC_EXTS.has(getExt(f.name)));
 
   filteredFiles = q ? base.filter(f => f.name.toLowerCase().includes(q)) : base;
   renderFileList();
