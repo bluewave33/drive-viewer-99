@@ -272,9 +272,14 @@ html, body {
 }
 
 .sidebar-footer {
-  padding: 14px 18px;
+  padding: 10px 14px;
   border-top: 1px solid var(--border);
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 6px;
+  flex-wrap: nowrap;
+}
+.sidebar-footer .btn-sm {
+  flex: 1; font-size: 16px; padding: 8px 4px;
+  text-align: center;
 }
 .btn-sm {
   flex: 1;
@@ -600,11 +605,11 @@ table.data-table tbody td:first-child {
 
     <div id="file-list"></div>
 
-    <div class="sidebar-footer" style="flex-wrap:wrap;gap:6px">
-      <button class="btn-sm primary" onclick="loadFiles()">🔄 새로고침</button>
-      <button class="btn-sm" onclick="clearChecked()">☐ 초기화</button>
-      <button class="btn-sm" id="btn-oauth" onclick="googleLogin()" style="display:none">🔐 로그인</button>
-      <button class="btn-sm" onclick="showConfig()">⚙ 설정</button>
+    <div class="sidebar-footer">
+      <button class="btn-sm primary" onclick="loadFiles()">🔄</button>
+      <button class="btn-sm" onclick="clearChecked()">☐</button>
+      <button class="btn-sm" id="btn-oauth" onclick="googleLogin()" style="display:none" title="Google 로그인 (삭제 기능)">🔐</button>
+      <button class="btn-sm" onclick="showConfig()">⚙</button>
     </div>
   </aside>
 
@@ -1049,7 +1054,7 @@ function googleLogin() {
     callback: (resp) => {
       if (resp.error) { alert('로그인 실패: ' + resp.error); return; }
       oauthToken = resp.access_token;
-      document.getElementById('btn-oauth').textContent  = '✅ 로그인됨';
+      document.getElementById('btn-oauth').textContent  = '✅';
       document.getElementById('btn-oauth').style.background = 'rgba(58,112,64,.15)';
       document.getElementById('btn-oauth').style.color = '#3a7040';
       showToast('로그인 완료!\n이제 체크박스로 파일을 삭제/복구할 수 있어요.', '✅');
