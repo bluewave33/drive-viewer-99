@@ -519,6 +519,9 @@ table.data-table tbody td:first-child {
   </div>
 </div>
 
+<!-- ── 토스트 알림 ── -->
+<div id="toast"></div>
+
 <!-- ───────────── 메인 앱 ───────────── -->
 <div id="app">
 
@@ -759,15 +762,8 @@ async function toggleCheck(e, fileId) {
         alert('오류: ' + err.message);
       }
     } else {
-      // 로그인 안 된 상태 → 로컬 체크만 (표시용)
-      checkedFiles.add(fileId);
-      saveChecked();
-      if (item) {
-        item.style.transition = 'opacity 0.5s ease, transform 0.4s ease';
-        item.style.opacity = '0.35';
-        item.style.transform = 'translateX(10px)';
-        setTimeout(() => renderFileList(), 600);
-      }
+      // 로그인 안 된 상태 → 알림 표시
+      showToast('🔐 삭제하려면 먼저 로그인하세요!');
     }
   } else {
     // ── 체크 해제 = 휴지통에서 복구 ──
@@ -798,10 +794,8 @@ async function toggleCheck(e, fileId) {
         alert('오류: ' + err.message);
       }
     } else {
-      // 로그인 안 된 상태 → 로컬 체크 해제만
-      checkedFiles.delete(fileId);
-      saveChecked();
-      renderFileList();
+      // 로그인 안 된 상태 → 알림
+      showToast('🔐 복구하려면 먼저 로그인하세요!');
     }
   }
 }
@@ -983,6 +977,15 @@ function filterFiles(type) {
 
 function searchFiles(q) {
   filterFiles(currentFilter);
+}
+
+let _toastTimer = null;
+function showToast(msg, duration=2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), duration);
 }
 
 // ═══════════════════════════════════════════════
