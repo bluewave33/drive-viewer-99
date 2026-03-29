@@ -635,18 +635,26 @@ let CFG = {
 };
 let oauthToken = null;  // OAuth 액세스 토큰
 
-// ── localStorage에서 설정 불러오기 ──
+// ── 기본값 (하드코딩) 백업 ──
+const CFG_DEFAULT = { API_KEY: CFG.API_KEY, FOLDER_ID: CFG.FOLDER_ID, CLIENT_ID: CFG.CLIENT_ID };
+
+// ── localStorage 설정 불러오기 (localStorage가 하드코딩보다 우선) ──
 function loadConfig() {
   const saved = localStorage.getItem('drive_viewer_cfg');
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
-      // 하드코딩된 값이 없을 때만 localStorage 값 사용
-      if (!CFG.API_KEY   && parsed.API_KEY)   CFG.API_KEY   = parsed.API_KEY;
-      if (!CFG.FOLDER_ID && parsed.FOLDER_ID) CFG.FOLDER_ID = parsed.FOLDER_ID;
-      if (!CFG.CLIENT_ID && parsed.CLIENT_ID) CFG.CLIENT_ID = parsed.CLIENT_ID;
+      // localStorage 값이 있으면 우선 적용
+      if (parsed.API_KEY)   CFG.API_KEY   = parsed.API_KEY;
+      if (parsed.FOLDER_ID) CFG.FOLDER_ID = parsed.FOLDER_ID;
+      if (parsed.CLIENT_ID !== undefined) CFG.CLIENT_ID = parsed.CLIENT_ID;
     } catch(e) {}
   }
+  // 그래도 없으면 하드코딩 기본값 사용
+  if (!CFG.API_KEY)   CFG.API_KEY   = CFG_DEFAULT.API_KEY;
+  if (!CFG.FOLDER_ID) CFG.FOLDER_ID = CFG_DEFAULT.FOLDER_ID;
+  if (!CFG.CLIENT_ID) CFG.CLIENT_ID = CFG_DEFAULT.CLIENT_ID;
+
   if (CFG.API_KEY && CFG.FOLDER_ID) {
     hideCfgModal();
     init();
