@@ -639,7 +639,13 @@ let oauthToken = null;  // OAuth 액세스 토큰
 function loadConfig() {
   const saved = localStorage.getItem('drive_viewer_cfg');
   if (saved) {
-    try { CFG = { ...CFG, ...JSON.parse(saved) }; } catch(e) {}
+    try {
+      const parsed = JSON.parse(saved);
+      // 하드코딩된 값이 없을 때만 localStorage 값 사용
+      if (!CFG.API_KEY   && parsed.API_KEY)   CFG.API_KEY   = parsed.API_KEY;
+      if (!CFG.FOLDER_ID && parsed.FOLDER_ID) CFG.FOLDER_ID = parsed.FOLDER_ID;
+      if (!CFG.CLIENT_ID && parsed.CLIENT_ID) CFG.CLIENT_ID = parsed.CLIENT_ID;
+    } catch(e) {}
   }
   if (CFG.API_KEY && CFG.FOLDER_ID) {
     hideCfgModal();
@@ -651,9 +657,9 @@ function loadConfig() {
 
 function showCfgModal() {
   document.getElementById('cfg-overlay').style.display = 'flex';
-  if (CFG.FOLDER_ID) document.getElementById('cfg-folder-id').value = CFG.FOLDER_ID;
-  if (CFG.API_KEY)   document.getElementById('cfg-api-key').value   = CFG.API_KEY;
-  if (CFG.CLIENT_ID) document.getElementById('cfg-client-id').value = CFG.CLIENT_ID;
+  document.getElementById('cfg-folder-id').value = CFG.FOLDER_ID || '';
+  document.getElementById('cfg-api-key').value   = CFG.API_KEY   || '';
+  document.getElementById('cfg-client-id').value = CFG.CLIENT_ID || '';
 }
 
 function hideCfgModal() {
