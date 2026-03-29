@@ -1005,7 +1005,10 @@ function googleLogin() {
       document.getElementById('btn-oauth').textContent  = '✅ 로그인됨';
       document.getElementById('btn-oauth').style.background = 'rgba(58,112,64,.15)';
       document.getElementById('btn-oauth').style.color = '#3a7040';
-      document.getElementById('btn-delete').style.display = '';
+      // 토스트 즉시 숨기기
+      const toast = document.getElementById('toast');
+      toast.classList.remove('show');
+      showToast('✅ 로그인 완료! 이제 체크로 파일을 삭제할 수 있어요.', 3000);
     }
   });
   client.requestAccessToken();
