@@ -486,6 +486,43 @@ table.data-table tbody td:first-child {
 
 /* ── 스크롤바 전역 ─────────────────────────────── */
 * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.15) transparent; }
+
+/* ── 팝업 알림 ──────────────────────────── */
+#toast-overlay {
+  position: fixed; inset: 0; z-index: 9998;
+  background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .25s ease;
+  pointer-events: none;
+}
+#toast-overlay.show { opacity: 1; pointer-events: auto; }
+#toast {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  padding: 32px 36px;
+  min-width: 280px; max-width: 360px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  transform: translateY(12px) scale(.97);
+  transition: transform .25s ease;
+}
+#toast-overlay.show #toast { transform: translateY(0) scale(1); }
+#toast-icon { font-size: 38px; margin-bottom: 14px; }
+#toast-msg {
+  font-size: 14px; color: var(--text); line-height: 1.7;
+  font-family: 'Noto Sans KR', sans-serif; margin-bottom: 22px;
+  white-space: pre-line;
+}
+#toast-btn {
+  background: var(--gold); color: #fff;
+  border: none; border-radius: 8px;
+  font-size: 13px; font-weight: 700;
+  font-family: 'Noto Sans KR', sans-serif;
+  padding: 10px 32px; cursor: pointer;
+  transition: background .15s;
+}
+#toast-btn:hover { background: var(--gold2); color: var(--text); }
 </style>
 </head>
 <body>
