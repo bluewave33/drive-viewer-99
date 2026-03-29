@@ -1283,9 +1283,16 @@ function openPDF(fileId) {
 
 // ── Word ──────────────────────────────────────
 function openWord(fileId) {
-  const downloadUrl = encodeURIComponent(`https://drive.google.com/uc?export=download&id=${fileId}`);
-  const src = `https://view.officeapps.live.com/op/embed.aspx?src=${downloadUrl}`;
-  document.getElementById('embed-iframe').src = src;
+  // Drive 공개 공유 URL로 Microsoft Office Online 뷰어 사용
+  const driveUrl = encodeURIComponent(`https://drive.google.com/file/d/${fileId}/preview`);
+  const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${driveUrl}`;
+
+  // 먼저 Drive 자체 미리보기 시도
+  const iframe = document.getElementById('embed-iframe');
+  iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+
+  // 로드 실패 시 Office Online으로 폴백
+  iframe.onerror = () => { iframe.src = officeUrl; };
   showView('embed-view');
 }
 
@@ -1325,8 +1332,7 @@ function openNewWindow() {
   let url;
   if (ext === '.pdf')  url = `https://drive.google.com/file/d/${currentFileId}/preview`;
   else if (ext === '.docx' || ext === '.doc') {
-    const downloadUrl = encodeURIComponent(`https://drive.google.com/uc?export=download&id=${currentFileId}`);
-    url = `https://view.officeapps.live.com/op/view.aspx?src=${downloadUrl}`;
+    url = `https://drive.google.com/file/d/${currentFileId}/preview`;
   }
   else
     url = `https://drive.google.com/file/d/${currentFileId}/view`;
