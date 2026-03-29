@@ -1006,13 +1006,9 @@ async function deleteChecked() {
   if (!ids.length) { alert('삭제할 파일을 체크해주세요.'); return; }
 
   const names = allFiles.filter(f => ids.includes(f.id)).map(f => f.name);
-  const msg = `다음 ${ids.length}개 파일을 Drive 휴지통으로 이동할까요?
-
-`
-    + names.slice(0,5).join('
-')
-    + (names.length > 5 ? `
-...외 ${names.length-5}개` : '');
+  const msg = '다음 ' + ids.length + '개 파일을 Drive 휴지통으로 이동할까요?\n\n'
+    + names.slice(0,5).join('\n')
+    + (names.length > 5 ? '\n...외 ' + (names.length-5) + '개' : '');
   if (!confirm(msg)) return;
 
   let ok = 0, fail = 0;
