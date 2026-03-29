@@ -6,6 +6,7 @@
 <title>Drive File Viewer</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
@@ -508,6 +509,12 @@ table.data-table tbody td:first-child {
       <div class="cfg-hint">Google Cloud Console → Credentials → API Key (Drive API 허용)</div>
     </div>
 
+    <div class="cfg-field">
+      <label class="cfg-label">OAuth Client ID (선택 - 삭제 기능용)</label>
+      <input id="cfg-client-id" class="cfg-input" placeholder="xxxx.apps.googleusercontent.com" spellcheck="false">
+      <div class="cfg-hint">삭제 기능 필요 시 입력 · Google Cloud Console → OAuth 클라이언트 ID (웹 애플리케이션)</div>
+    </div>
+
     <button class="cfg-btn" onclick="applyConfig()">🚀  시작하기</button>
   </div>
 </div>
@@ -547,9 +554,10 @@ table.data-table tbody td:first-child {
 
     <div id="file-list"></div>
 
-    <div class="sidebar-footer">
+    <div class="sidebar-footer" style="flex-wrap:wrap;gap:6px">
       <button class="btn-sm primary" onclick="loadFiles()">🔄 새로고침</button>
       <button class="btn-sm" onclick="clearChecked()">☐ 초기화</button>
+      <button class="btn-sm" id="btn-oauth" onclick="googleLogin()" style="display:none">🔐 로그인</button>
       <button class="btn-sm" onclick="showConfig()">⚙ 설정</button>
     </div>
   </aside>
@@ -623,7 +631,9 @@ table.data-table tbody td:first-child {
 let CFG = {
   API_KEY:   'AIzaSyDFJi9odbv2htHLFyrVRB9xrhkdxFVv3w8',
   FOLDER_ID: '13DX6EN9I4N4kBFOvoLreb8A0jBoe_jVt'
+  CLIENT_ID: '85298975973-uqajj35am4taltfhrojtqd3avevtoom2.apps.googleusercontent.com'   // OAuth용 (삭제 기능) - Google Cloud Console → OAuth 클라이언트 ID
 };
+let oauthToken = null;  // OAuth 액세스 토큰
 
 // ── localStorage에서 설정 불러오기 ──
 function loadConfig() {
@@ -643,6 +653,7 @@ function showCfgModal() {
   document.getElementById('cfg-overlay').style.display = 'flex';
   if (CFG.FOLDER_ID) document.getElementById('cfg-folder-id').value = CFG.FOLDER_ID;
   if (CFG.API_KEY)   document.getElementById('cfg-api-key').value   = CFG.API_KEY;
+  if (CFG.CLIENT_ID) document.getElementById('cfg-client-id').value = CFG.CLIENT_ID;
 }
 
 function hideCfgModal() {
@@ -661,8 +672,9 @@ function applyConfig() {
     alert('폴더 ID와 API Key를 모두 입력해주세요.');
     return;
   }
-  CFG.FOLDER_ID = fid;
-  CFG.API_KEY   = key;
+  CFG.FOLDER_ID  = fid;
+  CFG.API_KEY    = key;
+  CFG.CLIENT_ID  = document.getElementById('cfg-client-id').value.trim();
   localStorage.setItem('drive_viewer_cfg', JSON.stringify(CFG));
   hideCfgModal();
   init();
@@ -692,28 +704,91 @@ function saveChecked() {
   localStorage.setItem('checked_files', JSON.stringify([...checkedFiles]));
 }
 
-function toggleCheck(e, fileId) {
+async function toggleCheck(e, fileId) {
   e.stopPropagation();
   const isChecking = !checkedFiles.has(fileId);
+  const item = e.target.closest('.file-item');
+  const checkBtn = e.target.closest('.check-btn');
 
   if (isChecking) {
-    checkedFiles.add(fileId);
-    saveChecked();
-    // 체크 시: 먼저 페이드아웃 후 아래로 이동
-    const item = e.target.closest('.file-item');
-    if (item) {
-      item.style.transition = 'opacity 0.5s ease, transform 0.4s ease';
-      item.style.opacity = '0.35';
-      item.style.transform = 'translateX(10px)';
-      setTimeout(() => renderFileList(), 600);
+    // ── 체크 = 휴지통으로 이동 ──
+    if (oauthToken) {
+      // 로그인 상태 → 즉시 Drive 휴지통으로
+      if (checkBtn) checkBtn.textContent = '⏳';
+      try {
+        const res = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${fileId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${oauthToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ trashed: true })
+          }
+        );
+        if (res.ok) {
+          checkedFiles.add(fileId);
+          saveChecked();
+          if (item) {
+            item.style.transition = 'opacity 0.5s ease, transform 0.4s ease';
+            item.style.opacity = '0.2';
+            item.style.transform = 'translateX(12px)';
+            setTimeout(() => renderFileList(), 600);
+          }
+        } else {
+          if (checkBtn) checkBtn.textContent = '☐';
+          alert('휴지통 이동 실패. 다시 시도해주세요.');
+        }
+      } catch(err) {
+        if (checkBtn) checkBtn.textContent = '☐';
+        alert('오류: ' + err.message);
+      }
     } else {
-      renderFileList();
+      // 로그인 안 된 상태 → 로컬 체크만 (표시용)
+      checkedFiles.add(fileId);
+      saveChecked();
+      if (item) {
+        item.style.transition = 'opacity 0.5s ease, transform 0.4s ease';
+        item.style.opacity = '0.35';
+        item.style.transform = 'translateX(10px)';
+        setTimeout(() => renderFileList(), 600);
+      }
     }
   } else {
-    checkedFiles.delete(fileId);
-    saveChecked();
-    // 체크 해제 시: 바로 페이드인 후 위로
-    renderFileList();
+    // ── 체크 해제 = 휴지통에서 복구 ──
+    if (oauthToken) {
+      if (checkBtn) checkBtn.textContent = '⏳';
+      try {
+        const res = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${fileId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${oauthToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ trashed: false })
+          }
+        );
+        if (res.ok) {
+          checkedFiles.delete(fileId);
+          saveChecked();
+          renderFileList();
+        } else {
+          if (checkBtn) checkBtn.textContent = '✅';
+          alert('복구 실패. 다시 시도해주세요.');
+        }
+      } catch(err) {
+        if (checkBtn) checkBtn.textContent = '✅';
+        alert('오류: ' + err.message);
+      }
+    } else {
+      // 로그인 안 된 상태 → 로컬 체크 해제만
+      checkedFiles.delete(fileId);
+      saveChecked();
+      renderFileList();
+    }
   }
 }
 
@@ -724,6 +799,10 @@ const DOC_EXTS  = new Set(['.pdf','.docx','.doc']);
 //  INIT
 // ═══════════════════════════════════════════════
 async function init() {
+  // CLIENT_ID 있으면 로그인 버튼 표시
+  if (CFG.CLIENT_ID) {
+    document.getElementById('btn-oauth').style.display = '';
+  }
   await loadFiles();
 }
 
@@ -892,6 +971,74 @@ function searchFiles(q) {
   filterFiles(currentFilter);
 }
 
+// ═══════════════════════════════════════════════
+//  OAuth 로그인 & 삭제
+// ═══════════════════════════════════════════════
+function googleLogin() {
+  if (!CFG.CLIENT_ID) {
+    alert('설정에서 OAuth Client ID를 먼저 입력해주세요.');
+    return;
+  }
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: CFG.CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/drive',
+    callback: (resp) => {
+      if (resp.error) { alert('로그인 실패: ' + resp.error); return; }
+      oauthToken = resp.access_token;
+      document.getElementById('btn-oauth').textContent  = '✅ 로그인됨';
+      document.getElementById('btn-oauth').style.background = 'rgba(58,112,64,.15)';
+      document.getElementById('btn-oauth').style.color = '#3a7040';
+      document.getElementById('btn-delete').style.display = '';
+    }
+  });
+  client.requestAccessToken();
+}
+
+async function deleteChecked() {
+  if (!oauthToken) { alert('먼저 로그인해주세요.'); return; }
+  const ids = [...checkedFiles];
+  if (!ids.length) { alert('삭제할 파일을 체크해주세요.'); return; }
+
+  const names = allFiles.filter(f => ids.includes(f.id)).map(f => f.name);
+  const msg = `다음 ${ids.length}개 파일을 Drive 휴지통으로 이동할까요?
+
+`
+    + names.slice(0,5).join('
+')
+    + (names.length > 5 ? `
+...외 ${names.length-5}개` : '');
+  if (!confirm(msg)) return;
+
+  let ok = 0, fail = 0;
+  for (const id of ids) {
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${oauthToken}` }
+      });
+      if (res.status === 204 || res.ok) {
+        ok++;
+        checkedFiles.delete(id);
+        allFiles = allFiles.filter(f => f.id !== id);
+        // folderFileMap에서도 제거
+        for (const key of Object.keys(folderFileMap)) {
+          folderFileMap[key] = folderFileMap[key].filter(f => f.id !== id);
+        }
+      } else { fail++; }
+    } catch(e) { fail++; }
+  }
+
+  saveChecked();
+  updateStats();
+  filterFiles(currentFilter);
+  renderFolderTree();
+
+  alert(`삭제 완료 ✅
+성공: ${ok}개  실패: ${fail}개
+
+Drive 휴지통에서 복구 가능합니다.`);
+}
+
 function toggleWrap() {
   const btn = document.getElementById('wrap-btn');
   const tds = document.querySelectorAll('table.data-table tbody td');
@@ -944,7 +1091,7 @@ function renderFileList() {
           <div class="file-meta">${mod}</div>
         </div>
         <span class="file-badge ${badge.cls}">${badge.text}</span>
-        <span class="check-btn" onclick="toggleCheck(event,'${f.id}')" title="확인 체크">${checkIcon}</span>
+        <span class="check-btn" onclick="toggleCheck(event,'${f.id}')" title="체크→휴지통 / 해제→복구 (로그인 필요)">${checkIcon}</span>
       </div>`;
   }).join('');
 }
