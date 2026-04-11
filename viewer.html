@@ -1231,11 +1231,15 @@ function renderFolderTree() {
   const el = document.getElementById('folder-tree');
   if (!allFolders.length) { el.innerHTML = ''; return; }
 
-  // HTML onclick 속성 안에서는 " 로 감싸면 ' 를 그대로 써도 됨
-  const q = (s) => "'" + s + "'";  // onclick 안에 id 넣을 때 사용
+  const countAll = (fid) => {
+    const d = (folderFileMap[fid] || []).length;
+    const s = allFolders.filter(f => f._parentId === fid)
+      .reduce((a,sf) => a + countAll(sf.id), 0);
+    return d + s;
+  };
 
   let html = '<div class="tree-item ' + (currentFolderId==='root'?'active':'') + '"'
-    + ' onclick="selectFolder(' + q('root') + ')">'
+    + ' data-fid="root">'
     + '<span class="tree-indent"></span>'
     + '<span class="tree-arrow" style="visibility:hidden">▶</span>'
     + '<span class="tree-icon">📂</span>'
@@ -1246,40 +1250,41 @@ function renderFolderTree() {
   function renderNode(parentId, depth) {
     const children = allFolders.filter(f => f._parentId === parentId)
       .sort((a,b) => a.name.localeCompare(b.name));
-
     for (const folder of children) {
       const hasChildren = allFolders.some(f => f._parentId === folder.id);
       const isCollapsed = collapsedFolders.has(folder.id);
       const isActive    = currentFolderId === folder.id;
+      const cnt         = countAll(folder.id);
       const indent      = depth * 14;
-
-      const countAll = (fid) => {
-        const d = (folderFileMap[fid] || []).length;
-        const s = allFolders.filter(f => f._parentId === fid).reduce((a,sf) => a + countAll(sf.id), 0);
-        return d + s;
-      };
-      const cnt = countAll(folder.id);
-
       html += '<div class="tree-item ' + (isActive?'active':'') + '"'
-        + ' onclick="selectFolder(' + q(folder.id) + ')"'
+        + ' data-fid="' + folder.id + '"'
         + ' title="' + escHtml(folder.name) + '">'
         + '<span class="tree-indent" style="width:' + (indent+14) + 'px"></span>'
         + '<span class="tree-arrow ' + (hasChildren?(isCollapsed?'':'open'):'') + '"'
         + ' style="visibility:' + (hasChildren?'visible':'hidden') + '"'
-        + ' onclick="event.stopPropagation();toggleFolder(' + q(folder.id) + ')">'
-        + '▶</span>'
+        + ' data-toggle="' + folder.id + '">▶</span>'
         + '<span class="tree-icon">' + (depth===0?'📁':'📄') + '</span>'
         + '<span class="tree-label">' + escHtml(folder.name) + '</span>'
         + '<span class="tree-count">' + cnt + '</span>'
         + '</div>';
-
-      if (!isCollapsed) {
-        renderNode(folder.id, depth + 1);
-      }
+      if (!isCollapsed) renderNode(folder.id, depth + 1);
     }
   }
   renderNode(CFG.FOLDER_ID, 0);
   el.innerHTML = html;
+
+  // onclick을 addEventListener로 등록 (onclick 속성 완전 제거)
+  el.querySelectorAll('.tree-item').forEach(item => {
+    item.addEventListener('click', function(e) {
+      const arrow = e.target.closest('[data-toggle]');
+      if (arrow) {
+        e.stopPropagation();
+        toggleFolder(arrow.dataset.toggle);
+      } else {
+        selectFolder(this.dataset.fid);
+      }
+    });
+  });
 }
 
 // 폴더 접기/펼치기
@@ -1479,6 +1484,20 @@ function renderFileList() {
         <span class="check-btn" onclick="toggleCheck(event,'${f.id}')" title="체크→휴지통 / 해제→복구 (로그인 필요)">${checkIcon}</span>
       </div>`;
   }).join('');
+
+  // 카드 버튼 이벤트 등록
+  el.querySelectorAll('[data-edit]').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      openCardModal(this.dataset.edit);
+    });
+  });
+  el.querySelectorAll('[data-del]').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      deleteCard(this.dataset.del);
+    });
+  });
 }
 
 // ═══════════════════════════════════════════════
@@ -1876,8 +1895,8 @@ function renderInsightCards() {
       + (tags ? '<div class="card-tags">' + tags + '</div>' : '')
       + fileRef
       + '<div class="card-actions">'
-      + '<button class="card-action-btn" onclick="event.stopPropagation();openCardModal(' + "'" + c.id + "'" + ')" title="수정">✏️</button>'
-      + '<button class="card-action-btn" onclick="event.stopPropagation();deleteCard(' + "'" + c.id + "'" + ')" title="삭제">🗑</button>'
+      + '<button class="card-action-btn" data-edit="' + c.id + '" title="수정">✏️</button>'
+      + '<button class="card-action-btn" data-del="' + c.id + '" title="삭제">🗑</button>'
       + '</div></div>';
   }).join('');
 }
@@ -1935,10 +1954,16 @@ function renderFileRefPicker() {
     el.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--muted);font-family:Noto Sans KR,sans-serif">파일 목록을 먼저 로드해주세요</div>';
     return;
   }
-  el.innerHTML = '<div class="file-ref-item ' + (!selectedFileRef?'selected':'') + '" onclick="selectFileRef(null)">❌ 파일 참조 없음</div>'
+  el.innerHTML = '<div class="file-ref-item ' + (!selectedFileRef?'selected':'') + '" data-ref="">❌ 파일 참조 없음</div>'
     + allFiles.slice(0,40).map(f =>
-      '<div class="file-ref-item ' + (selectedFileRef===f.name?'selected':'') + '" onclick="selectFileRef(' + "'" + escHtml(f.name) + "'" + ')">' + escHtml(f.name) + '</div>'
+      '<div class="file-ref-item ' + (selectedFileRef===f.name?'selected':'') + '" data-ref="' + escHtml(f.name) + '">' + escHtml(f.name) + '</div>'
     ).join('');
+  el.querySelectorAll('.file-ref-item').forEach(item => {
+    item.addEventListener('click', function() {
+      const ref = this.dataset.ref || null;
+      selectFileRef(ref === '' ? null : ref);
+    });
+  });
 }
 
 function selectFileRef(name) {
