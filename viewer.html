@@ -257,6 +257,12 @@ html, body {
 .tree-item.active { border-left-color: var(--gold); color: var(--gold); background: var(--hover); font-weight: 600; }
 .tree-indent { display: inline-block; width: 14px; flex-shrink: 0; }
 .tree-icon { font-size: 13px; flex-shrink: 0; }
+.tree-arrow {
+  font-size: 10px; flex-shrink: 0; width: 14px; text-align: center;
+  color: var(--muted); transition: transform .2s ease;
+  user-select: none;
+}
+.tree-arrow.open { transform: rotate(90deg); }
 .tree-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .tree-count { font-size: 10px; color: var(--muted); margin-left: auto; padding-right: 10px; flex-shrink: 0; }
 
@@ -853,6 +859,7 @@ table.data-table tbody td:first-child {
       <div style="flex:1"></div>
       <div id="main-header-actions" style="display:flex;align-items:center;padding:0 16px;gap:8px">
         <div class="file-path" id="file-path-bar" style="font-size:12px;max-width:300px"></div>
+        <div class="btn-icon" title="인사이트 카드 추가" onclick="quickAddCard()" id="btn-add-insight" style="display:none">📝</div>
         <div class="btn-icon" title="Drive에서 열기" onclick="openInDrive()" id="btn-open-drive" style="display:none">🔗</div>
         <div class="btn-icon" title="새 창에서 열기" onclick="openNewWindow()" id="btn-open-new" style="display:none">↗</div>
       </div>
@@ -942,9 +949,9 @@ table.data-table tbody td:first-child {
 //  CONFIG
 // ═══════════════════════════════════════════════
 let CFG = {
-  API_KEY:   '',
-  FOLDER_ID: '',
-  CLIENT_ID: ''   // OAuth용 (삭제 기능) - Google Cloud Console → OAuth 클라이언트 ID
+  API_KEY:   'AIzaSyDFJi9odbv2htHLFyrVRB9xrhkdxFVv3w8',
+  FOLDER_ID: '13-hSePKjk7te6WfHrcwx9bhcFz5WIghd',
+  CLIENT_ID: '85298975973-uqajj35am4taltfhrojtqd3avevtoom2.apps.googleusercontent.com'   // OAuth용 (삭제 기능) - Google Cloud Console → OAuth 클라이언트 ID
 };
 let oauthToken = null;  // OAuth 액세스 토큰
 
@@ -1013,7 +1020,8 @@ function applyConfig() {
 let allFiles       = [];
 let allFolders     = [];        // Drive 폴더 목록
 let folderFileMap  = {};        // folderId → [files]
-let currentFolderId = 'root';   // 선택된 폴더 ('root' = 전체)
+let currentFolderId  = 'root';   // 선택된 폴더 ('root' = 전체)
+let collapsedFolders = new Set(); // 접힌 폴더 ID 세트
 let filteredFiles  = [];
 let currentFilter  = 'all';
 let currentFile    = null;
@@ -1208,40 +1216,71 @@ function renderFolderTree() {
   if (!allFolders.length) { el.innerHTML = ''; return; }
 
   // 전체 항목
-  let html = `<div class="tree-item ${currentFolderId==='root'?'active':''}"
-    onclick="selectFolder('root')">
-    <span class="tree-indent"></span>
-    <span class="tree-icon">📂</span>
-    <span class="tree-label">전체</span>
-    <span class="tree-count">${allFiles.length}</span>
-  </div>`;
+  let html = '<div class="tree-item ' + (currentFolderId==='root'?'active':'') + '" onclick="selectFolder('root')">'
+    + '<span class="tree-indent"></span>'
+    + '<span class="tree-arrow" style="visibility:hidden">▶</span>'
+    + '<span class="tree-icon">📂</span>'
+    + '<span class="tree-label">전체</span>'
+    + '<span class="tree-count">' + allFiles.length + '</span>'
+    + '</div>';
 
-  // 폴더 트리 (depth 순)
   function renderNode(parentId, depth) {
     const children = allFolders.filter(f => f._parentId === parentId)
       .sort((a,b) => a.name.localeCompare(b.name));
+
     for (const folder of children) {
-      const cnt = (folderFileMap[folder.id] || []).length;
-      const isActive = currentFolderId === folder.id;
-      const indent = depth * 14;
-      html += `<div class="tree-item ${isActive?'active':''}"
-        onclick="selectFolder('${folder.id}')"
-        title="${escHtml(folder.name)}">
-        <span class="tree-indent" style="width:${indent+14}px"></span>
-        <span class="tree-icon">${depth===0?'📁':'📄'}</span>
-        <span class="tree-label">${escHtml(folder.name)}</span>
-        <span class="tree-count">${cnt}</span>
-      </div>`;
-      renderNode(folder.id, depth + 1);
+      const hasChildren = allFolders.some(f => f._parentId === folder.id);
+      const isCollapsed = collapsedFolders.has(folder.id);
+      const isActive    = currentFolderId === folder.id;
+      const indent      = depth * 14;
+
+      // 하위 파일 수 (직접 + 하위 폴더 포함)
+      const countAll = (fid) => {
+        const d = (folderFileMap[fid] || []).length;
+        const s = allFolders.filter(f => f._parentId === fid).reduce((a,sf) => a + countAll(sf.id), 0);
+        return d + s;
+      };
+      const cnt = countAll(folder.id);
+
+      html += '<div class="tree-item ' + (isActive?'active':'') + '" '
+        + 'onclick="selectFolder('' + folder.id + '')" '
+        + 'title="' + escHtml(folder.name) + '">'
+        + '<span class="tree-indent" style="width:' + (indent+14) + 'px"></span>'
+        + '<span class="tree-arrow ' + (hasChildren?(isCollapsed?'':'open'):'') + '" '
+        + 'style="visibility:' + (hasChildren?'visible':'hidden') + '" '
+        + 'onclick="event.stopPropagation();toggleFolder('' + folder.id + '')">'
+        + '▶</span>'
+        + '<span class="tree-icon">' + (depth===0?'📁':'📄') + '</span>'
+        + '<span class="tree-label">' + escHtml(folder.name) + '</span>'
+        + '<span class="tree-count">' + cnt + '</span>'
+        + '</div>';
+
+      if (!isCollapsed) {
+        renderNode(folder.id, depth + 1);
+      }
     }
   }
   renderNode(CFG.FOLDER_ID, 0);
   el.innerHTML = html;
 }
 
+// 폴더 접기/펼치기
+function toggleFolder(folderId) {
+  if (collapsedFolders.has(folderId)) {
+    collapsedFolders.delete(folderId);
+  } else {
+    collapsedFolders.add(folderId);
+  }
+  renderFolderTree();
+}
+
 // 폴더 선택
 function selectFolder(folderId) {
   currentFolderId = folderId;
+  // 선택한 폴더가 접혀있으면 펼치기
+  if (collapsedFolders.has(folderId)) {
+    collapsedFolders.delete(folderId);
+  }
   renderFolderTree();
   updateStats();
   filterFiles(currentFilter);
@@ -1437,8 +1476,9 @@ async function openFile(fileId, name, mimeType) {
   // 헤더 업데이트
   document.getElementById('file-path-bar').innerHTML =
     `<span>${escHtml(name)}</span>`;
-  document.getElementById('btn-open-drive').style.display = 'flex';
-  document.getElementById('btn-open-new').style.display   = 'flex';
+  document.getElementById('btn-open-drive').style.display  = 'flex';
+  document.getElementById('btn-open-new').style.display    = 'flex';
+  document.getElementById('btn-add-insight').style.display = 'flex';
 
   const ext = getExt(name);
 
@@ -1647,6 +1687,19 @@ document.addEventListener('keydown', e => {
 
 // ── 시작 ─────────────────────────────────────
 loadConfig();
+
+// ══════════════════════════════════════════
+//  뷰어에서 빠른 카드 추가
+// ══════════════════════════════════════════
+function quickAddCard() {
+  // 현재 열려있는 파일을 참조로 미리 세팅
+  if (currentFile) {
+    selectedFileRef = currentFile.name;
+  }
+  // 인사이트 탭으로 전환 후 모달 열기
+  switchTab('insight');
+  setTimeout(() => openCardModal(), 150);
+}
 
 // ══════════════════════════════════════════
 //  탭 전환
