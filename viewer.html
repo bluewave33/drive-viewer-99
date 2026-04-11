@@ -1472,32 +1472,37 @@ function renderFileList() {
     const mod      = f.modifiedTime ? f.modifiedTime.slice(0,10) : '';
     const active   = currentFileId === f.id ? 'active' : '';
     const isChecked = checkedFiles.has(f.id);
-    const dimStyle = isChecked ? 'opacity:0.35;' : '';
+    const dimStyle  = isChecked ? 'opacity:0.35;' : '';
     const checkIcon = isChecked ? '✅' : '☐';
     return `
       <div class="file-item ${active}" style="animation-delay:${i*0.05}s;${dimStyle}"
-           onclick="openFile('${f.id}','${escHtml(f.name)}','${(f.mimeType||'').replace(/'/g,'')}')">
+           data-fid="${escHtml(f.id)}" data-mime="${escHtml(f.mimeType||'')}">
         <div class="file-icon">${icon}</div>
         <div class="file-info">
           <div class="file-name${isChecked ? ' file-checked' : ''}">${escHtml(f.name)}</div>
           <div class="file-meta">${mod}</div>
         </div>
         <span class="file-badge ${badge.cls}">${badge.text}</span>
-        <span class="check-btn" onclick="toggleCheck(event,'${f.id}')" title="체크→휴지통 / 해제→복구 (로그인 필요)">${checkIcon}</span>
+        <span class="check-btn" data-check="${escHtml(f.id)}" title="체크→휴지통 / 해제→복구 (로그인 필요)">${checkIcon}</span>
       </div>`;
   }).join('');
 
-  // 카드 버튼 이벤트 등록
-  el.querySelectorAll('[data-edit]').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      openCardModal(this.dataset.edit);
+  // 파일 클릭 이벤트 (data 속성 방식 - 파일명 특수문자 안전)
+  el.querySelectorAll('.file-item').forEach(item => {
+    item.addEventListener('click', function(e) {
+      // 체크버튼 클릭은 별도 처리
+      if (e.target.closest('[data-check]')) return;
+      const fid  = this.dataset.fid;
+      const file = allFiles.find(f => f.id === fid);
+      if (file) openFile(file.id, file.name, file.mimeType || '');
     });
   });
-  el.querySelectorAll('[data-del]').forEach(btn => {
+
+  // 체크 버튼 이벤트
+  el.querySelectorAll('[data-check]').forEach(btn => {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
-      deleteCard(this.dataset.del);
+      toggleCheck(e, this.dataset.check);
     });
   });
 }
