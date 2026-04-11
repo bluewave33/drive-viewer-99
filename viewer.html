@@ -1453,7 +1453,8 @@ function renderFileList() {
     const checkIcon = isChecked ? '✅' : '☐';
     return `
       <div class="file-item ${active}" style="animation-delay:${i*0.05}s;${dimStyle}"
-           onclick="openFile('${f.id}','${escHtml(f.name)}','${f.mimeType || ''}')">        <div class="file-icon">${icon}</div>
+           onclick="openFile('${f.id}','${escHtml(f.name)}','${(f.mimeType||'').replace(/'/g,'')}')">
+        <div class="file-icon">${icon}</div>
         <div class="file-info">
           <div class="file-name${isChecked ? ' file-checked' : ''}">${escHtml(f.name)}</div>
           <div class="file-meta">${mod}</div>
@@ -1580,23 +1581,17 @@ function renderTable(rows, _unused, title) {
 
 // ── PDF ───────────────────────────────────────
 function openPDF(fileId) {
-  const src = `https://drive.google.com/file/d/${fileId}/preview`;
+  // Google Docs 뷰어 사용 (CSP 제한 우회)
+  const src = `https://docs.google.com/viewer?srcid=${fileId}&pid=explorer&efh=false&a=v&chrome=false&embedded=true`;
   document.getElementById('embed-iframe').src = src;
   showView('embed-view');
 }
 
 // ── Word ──────────────────────────────────────
 function openWord(fileId) {
-  // Drive 공개 공유 URL로 Microsoft Office Online 뷰어 사용
-  const driveUrl = encodeURIComponent(`https://drive.google.com/file/d/${fileId}/preview`);
-  const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${driveUrl}`;
-
-  // 먼저 Drive 자체 미리보기 시도
-  const iframe = document.getElementById('embed-iframe');
-  iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
-
-  // 로드 실패 시 Office Online으로 폴백
-  iframe.onerror = () => { iframe.src = officeUrl; };
+  // Google Docs 뷰어 사용
+  const src = `https://docs.google.com/viewer?srcid=${fileId}&pid=explorer&efh=false&a=v&chrome=false&embedded=true`;
+  document.getElementById('embed-iframe').src = src;
   showView('embed-view');
 }
 
