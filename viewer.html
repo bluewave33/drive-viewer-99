@@ -1747,8 +1747,8 @@ function renderInsightCards() {
       + (tags ? '<div class="card-tags">' + tags + '</div>' : '')
       + fileRef
       + '<div class="card-actions">'
-      + '<button class="card-action-btn" onclick="event.stopPropagation();openCardModal('' + c.id + '')" title="수정">✏️</button>'
-      + '<button class="card-action-btn" onclick="event.stopPropagation();deleteCard('' + c.id + '')" title="삭제">🗑</button>'
+      + '<button class="card-action-btn" onclick="event.stopPropagation();openCardModal(\'' + c.id + '\')" title="수정">✏️</button>'
+      + '<button class="card-action-btn" onclick="event.stopPropagation();deleteCard(\'' + c.id + '\')" title="삭제">🗑</button>'
       + '</div></div>';
   }).join('');
 }
