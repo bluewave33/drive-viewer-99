@@ -1696,9 +1696,8 @@ function quickAddCard() {
   if (currentFile) {
     selectedFileRef = currentFile.name;
   }
-  // 인사이트 탭으로 전환 후 모달 열기
-  switchTab('insight');
-  setTimeout(() => openCardModal(), 150);
+  // 탭 전환 없이 바로 모달 열기
+  openCardModal();
 }
 
 // ══════════════════════════════════════════
@@ -1905,7 +1904,7 @@ async function saveCard() {
   closeCardModal();
   renderInsightCards();
   const ok = await saveInsights();
-  if (ok) showToast(editingId ? '수정됐어요!' : '카드가 저장됐어요!', '✅');
+  if (ok) showToast(editingId ? '✅ 수정됐어요!' : '✅ 카드가 저장됐어요! 📝 인사이트 탭에서 확인하세요.', '✅');
 }
 
 async function deleteCard(id) {
