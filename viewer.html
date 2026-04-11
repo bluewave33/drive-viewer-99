@@ -1215,8 +1215,11 @@ function renderFolderTree() {
   const el = document.getElementById('folder-tree');
   if (!allFolders.length) { el.innerHTML = ''; return; }
 
-  // 전체 항목
-  let html = '<div class="tree-item ' + (currentFolderId==='root'?'active':'') + '" onclick="selectFolder(\'root\')">'
+  // HTML onclick 속성 안에서는 " 로 감싸면 ' 를 그대로 써도 됨
+  const q = (s) => "'" + s + "'";  // onclick 안에 id 넣을 때 사용
+
+  let html = '<div class="tree-item ' + (currentFolderId==='root'?'active':'') + '"'
+    + ' onclick="selectFolder(' + q('root') + ')">'
     + '<span class="tree-indent"></span>'
     + '<span class="tree-arrow" style="visibility:hidden">▶</span>'
     + '<span class="tree-icon">📂</span>'
@@ -1234,7 +1237,6 @@ function renderFolderTree() {
       const isActive    = currentFolderId === folder.id;
       const indent      = depth * 14;
 
-      // 하위 파일 수 (직접 + 하위 폴더 포함)
       const countAll = (fid) => {
         const d = (folderFileMap[fid] || []).length;
         const s = allFolders.filter(f => f._parentId === fid).reduce((a,sf) => a + countAll(sf.id), 0);
@@ -1242,13 +1244,13 @@ function renderFolderTree() {
       };
       const cnt = countAll(folder.id);
 
-      html += '<div class="tree-item ' + (isActive?'active':'') + '" '
-        + 'onclick="selectFolder(\'' + folder.id + '\')" '
-        + 'title="' + escHtml(folder.name) + '">'
+      html += '<div class="tree-item ' + (isActive?'active':'') + '"'
+        + ' onclick="selectFolder(' + q(folder.id) + ')"'
+        + ' title="' + escHtml(folder.name) + '">'
         + '<span class="tree-indent" style="width:' + (indent+14) + 'px"></span>'
-        + '<span class="tree-arrow ' + (hasChildren?(isCollapsed?'':'open'):'') + '" '
-        + 'style="visibility:' + (hasChildren?'visible':'hidden') + '" '
-        + 'onclick="event.stopPropagation();toggleFolder(\'' + folder.id + '\')">'
+        + '<span class="tree-arrow ' + (hasChildren?(isCollapsed?'':'open'):'') + '"'
+        + ' style="visibility:' + (hasChildren?'visible':'hidden') + '"'
+        + ' onclick="event.stopPropagation();toggleFolder(' + q(folder.id) + ')">'
         + '▶</span>'
         + '<span class="tree-icon">' + (depth===0?'📁':'📄') + '</span>'
         + '<span class="tree-label">' + escHtml(folder.name) + '</span>'
@@ -1814,8 +1816,8 @@ function renderInsightCards() {
       + (tags ? '<div class="card-tags">' + tags + '</div>' : '')
       + fileRef
       + '<div class="card-actions">'
-      + '<button class="card-action-btn" onclick="event.stopPropagation();openCardModal(\'' + c.id + '\')" title="수정">✏️</button>'
-      + '<button class="card-action-btn" onclick="event.stopPropagation();deleteCard(\'' + c.id + '\')" title="삭제">🗑</button>'
+      + '<button class="card-action-btn" onclick="event.stopPropagation();openCardModal(' + "'" + c.id + "'" + ')" title="수정">✏️</button>'
+      + '<button class="card-action-btn" onclick="event.stopPropagation();deleteCard(' + "'" + c.id + "'" + ')" title="삭제">🗑</button>'
       + '</div></div>';
   }).join('');
 }
@@ -1875,7 +1877,7 @@ function renderFileRefPicker() {
   }
   el.innerHTML = '<div class="file-ref-item ' + (!selectedFileRef?'selected':'') + '" onclick="selectFileRef(null)">❌ 파일 참조 없음</div>'
     + allFiles.slice(0,40).map(f =>
-      '<div class="file-ref-item ' + (selectedFileRef===f.name?'selected':'') + '" onclick="selectFileRef(\'' + escHtml(f.name) + '\')">' + escHtml(f.name) + '</div>'
+      '<div class="file-ref-item ' + (selectedFileRef===f.name?'selected':'') + '" onclick="selectFileRef(' + "'" + escHtml(f.name) + "'" + ')">' + escHtml(f.name) + '</div>'
     ).join('');
 }
 
