@@ -1156,7 +1156,7 @@ async function driveList(q, fields, pageToken) {
   let url = `https://www.googleapis.com/drive/v3/files`
     + `?q=${encodeURIComponent(q)}`
     + `&fields=${encodeURIComponent(fields)}`
-    + `&pageSize=500&orderBy=name&key=${CFG.API_KEY}`;
+    + `&pageSize=500&orderBy=modifiedTime+desc&key=${CFG.API_KEY}`;
   if (pageToken) url += `&pageToken=${pageToken}`;
   const res = await fetch(url);
   if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || `HTTP ${res.status}`); }
@@ -1343,7 +1343,9 @@ function filterFiles(type) {
   if (type === 'data') base = base.filter(f => DATA_EXTS.has(getExt(f.name)));
   if (type === 'doc')  base = base.filter(f => DOC_EXTS.has(getExt(f.name)));
 
-  filteredFiles = q ? base.filter(f => f.name.toLowerCase().includes(q)) : base;
+  const result = q ? base.filter(f => f.name.toLowerCase().includes(q)) : base;
+  // 최신순 정렬
+  filteredFiles = [...result].sort((a,b) => (b.modifiedTime||'').localeCompare(a.modifiedTime||''));
   renderFileList();
 }
 
@@ -1672,6 +1674,25 @@ async function openWord(fileId) {
     const result = await mammoth.convertToHtml({ arrayBuffer: buf });
     const el = document.getElementById('word-content');
     el.innerHTML = result.value;
+
+    // 링크 클릭 시 새 탭으로 열기
+    el.querySelectorAll('a[href]').forEach(a => {
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
+      a.style.color = '#1a73e8';
+      a.style.textDecoration = 'underline';
+      a.style.cursor = 'pointer';
+    });
+
+    // 텍스트 내 URL도 자동 링크로 변환
+    el.querySelectorAll('p, li').forEach(node => {
+      const urlRegex = /(https?:\/\/[^\s<>"]+)/g;
+      if (!node.querySelector('a') && urlRegex.test(node.innerHTML)) {
+        node.innerHTML = node.innerHTML.replace(urlRegex,
+          '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#1a73e8;text-decoration:underline">$1</a>');
+      }
+    });
+
     showView('word-view');
     document.getElementById('word-view').style.display = 'flex';
   } catch(e) {
