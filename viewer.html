@@ -1710,7 +1710,15 @@ function switchTab(tab) {
   document.getElementById('insight-board').classList.toggle('visible', !isViewer);
   document.getElementById('tab-viewer').classList.toggle('active', isViewer);
   document.getElementById('tab-insight').classList.toggle('active', !isViewer);
-  if (!isViewer) { loadInsights().then(() => renderInsightCards()); }
+  if (!isViewer) {
+    renderInsightCards();
+    // Drive에서 로딩 (최초 1회만 - 이미 데이터 있으면 스킵)
+    if (oauthToken && insights.length === 0) {
+      loadInsights().then(() => renderInsightCards());
+    } else if (!oauthToken) {
+      showToast('인사이트를 불러오려면 🔐 로그인이 필요해요.', '🔐');
+    }
+  }
 }
 
 // ══════════════════════════════════════════
@@ -1735,20 +1743,24 @@ async function loadInsights() {
     );
     const data = await res.json();
     const files = data.files || [];
-    if (!files.length) { insights = []; return; }
+    if (!files.length) return; // 파일 없으면 기존 유지 (빈 배열로 초기화 안 함)
     const fileRes = await fetch(
       'https://www.googleapis.com/drive/v3/files/' + files[0].id + '?alt=media',
       { headers: { Authorization: 'Bearer ' + oauthToken } }
     );
-    insights = await fileRes.json();
-  } catch(e) { insights = []; }
+    const loaded = await fileRes.json();
+    if (Array.isArray(loaded)) insights = loaded;
+  } catch(e) { console.warn('Drive 불러오기 실패, 로컬 캐시 유지:', e); }
 }
 
 // ══════════════════════════════════════════
 //  Drive insights.json 저장
 // ══════════════════════════════════════════
 async function saveInsights() {
-  if (!oauthToken) { showToast('저장하려면 먼저 로그인해주세요.', '🔐'); return false; }
+  if (!oauthToken) {
+    showToast('저장하려면 먼저 🔐 로그인해주세요.', '🔐');
+    return false;
+  }
   try {
     const json = JSON.stringify(insights, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
@@ -1772,7 +1784,10 @@ async function saveInsights() {
       body: form
     });
     return true;
-  } catch(e) { showToast('저장 실패: ' + e.message, '❌'); return false; }
+  } catch(e) {
+    showToast('Drive 저장 실패: ' + e.message, '❌');
+    return false;
+  }
 }
 
 // ══════════════════════════════════════════
