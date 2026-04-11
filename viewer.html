@@ -1216,7 +1216,7 @@ function renderFolderTree() {
   if (!allFolders.length) { el.innerHTML = ''; return; }
 
   // 전체 항목
-  let html = '<div class="tree-item ' + (currentFolderId==='root'?'active':'') + '" onclick="selectFolder('root')">'
+  let html = '<div class="tree-item ' + (currentFolderId==='root'?'active':'') + '" onclick="selectFolder(\'root\')">'
     + '<span class="tree-indent"></span>'
     + '<span class="tree-arrow" style="visibility:hidden">▶</span>'
     + '<span class="tree-icon">📂</span>'
@@ -1243,12 +1243,12 @@ function renderFolderTree() {
       const cnt = countAll(folder.id);
 
       html += '<div class="tree-item ' + (isActive?'active':'') + '" '
-        + 'onclick="selectFolder('' + folder.id + '')" '
+        + 'onclick="selectFolder(\'' + folder.id + '\')" '
         + 'title="' + escHtml(folder.name) + '">'
         + '<span class="tree-indent" style="width:' + (indent+14) + 'px"></span>'
         + '<span class="tree-arrow ' + (hasChildren?(isCollapsed?'':'open'):'') + '" '
         + 'style="visibility:' + (hasChildren?'visible':'hidden') + '" '
-        + 'onclick="event.stopPropagation();toggleFolder('' + folder.id + '')">'
+        + 'onclick="event.stopPropagation();toggleFolder(\'' + folder.id + '\')">'
         + '▶</span>'
         + '<span class="tree-icon">' + (depth===0?'📁':'📄') + '</span>'
         + '<span class="tree-label">' + escHtml(folder.name) + '</span>'
