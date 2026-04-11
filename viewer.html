@@ -942,9 +942,9 @@ table.data-table tbody td:first-child {
 //  CONFIG
 // ═══════════════════════════════════════════════
 let CFG = {
-  API_KEY:   'AIzaSyDFJi9odbv2htHLFyrVRB9xrhkdxFVv3w8',
-  FOLDER_ID: '13-hSePKjk7te6WfHrcwx9bhcFz5WIghd',
-  CLIENT_ID: '85298975973-uqajj35am4taltfhrojtqd3avevtoom2.apps.googleusercontent.com'   // OAuth용 (삭제 기능) - Google Cloud Console → OAuth 클라이언트 ID
+  API_KEY:   '',
+  FOLDER_ID: '',
+  CLIENT_ID: ''   // OAuth용 (삭제 기능) - Google Cloud Console → OAuth 클라이언트 ID
 };
 let oauthToken = null;  // OAuth 액세스 토큰
 
@@ -1808,7 +1808,7 @@ function renderFileRefPicker() {
   }
   el.innerHTML = '<div class="file-ref-item ' + (!selectedFileRef?'selected':'') + '" onclick="selectFileRef(null)">❌ 파일 참조 없음</div>'
     + allFiles.slice(0,40).map(f =>
-      '<div class="file-ref-item ' + (selectedFileRef===f.name?'selected':'') + '" onclick="selectFileRef('' + escHtml(f.name) + '')">' + escHtml(f.name) + '</div>'
+      '<div class="file-ref-item ' + (selectedFileRef===f.name?'selected':'') + '" onclick="selectFileRef(\'' + escHtml(f.name) + '\')">' + escHtml(f.name) + '</div>'
     ).join('');
 }
 
